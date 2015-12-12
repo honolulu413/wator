@@ -17,8 +17,8 @@ import Graphics.Collage exposing (..)
 import Color exposing (..)
 
 randomSeed = 123457
-rowN = 75
-columnN = 75
+rowN = 30
+columnN = 30
 fishStarvation = 10000
 fishGestation = 10
 sharkStarvation = 20
@@ -48,7 +48,7 @@ getTimes d =
 
 type Direction = LEFT | RIGHT | UP | DOWN
 
-type alias Model = {seed : Random.Seed, creatures : List Denizen, steps : Int}
+type alias Model = {seed : Random.Seed, creatures : List Denizen, steps : Int, fishN : Int, sharkN : Int}
 
 fish0 = Fish (Object 1 1 fishGestation fishStarvation)
 fish1 = Fish (Object 2 3 fishGestation fishStarvation)
@@ -59,19 +59,53 @@ fish5 = Fish (Object 3 3 fishGestation fishStarvation)
 shark0 = Shark (Object 3 3 sharkGestation sharkStarvation)
 shark1 = Shark (Object 3 3 -1 sharkStarvation)
 
-initModel = Model (Random.initialSeed randomSeed) [shark0, fish0, fish1, fish2, fish3, fish4 ] 6
-model1 = Model (Random.initialSeed randomSeed) [fish5, fish0, fish1, fish2, fish3, fish4 ] 6
-model2 = Model (Random.initialSeed randomSeed) [shark1, fish0, fish1, fish2, fish3, fish4 ] 6
+initModel = Model (Random.initialSeed randomSeed) [shark0, fish0, fish1, fish2, fish3, fish4 ] 6 5 1
+model1 = Model (Random.initialSeed randomSeed) [fish5, fish0, fish1, fish2, fish3, fish4 ] 6 6 0
+model2 = Model (Random.initialSeed randomSeed) [shark1, fish0, fish1, fish2, fish3, fish4 ] 6 5 1
+model3 = Model (Random.initialSeed randomSeed) [shark1, fish0, fish1, fish2, fish3, fish4 ] 6 2 2
 
 
 type Action
    = MakeAMove
+   | SetFishN Int
+   | SetShark Int
+   | Populate
    
 update : Action -> Model -> Model               
 update action model = 
    case action of
       MakeAMove -> updateWholeBoard model
-      
+      SetFishN n -> { model | fishN = n}
+      SetShark n -> { model | sharkN = n}
+      Populate -> populate (emptyCreatures model)
+
+emptyCreatures : Model -> Model
+emptyCreatures m  = { m | creatures = []}
+
+populate : Model -> Model
+populate  m = populateShark m.sharkN (populateFish m.fishN  (emptyCreatures m))  |> refresh
+
+populateFish : Int -> Model -> Model
+populateFish n m = case n of
+  0 -> m
+  _ -> let gen1 = Random.int 1 rowN in
+          let (x, s1) = Random.generate gen1 m.seed in
+          let (y, s2) = Random.generate gen1 s1 in
+          case getCreature m.creatures (x, y) of
+          Nothing -> populateFish (n-1) {m | creatures = m.creatures ++ [Fish (Object x y fishGestation fishStarvation)], seed = s2} 
+          _ -> populateFish n { m | seed = s2} 
+          
+populateShark : Int -> Model -> Model
+populateShark n m = case n of
+  0 -> m
+  _ -> let gen1 = Random.int 1 rowN in
+          let (x, s1) = Random.generate gen1 m.seed in
+          let (y, s2) = Random.generate gen1 s1 in
+          case getCreature m.creatures (x, y) of
+          Nothing -> populateFish (n-1) {m | creatures = m.creatures ++ [Fish (Object x y sharkGestation sharkStarvation)], seed = s2} 
+          _ -> populateFish n { m | seed = s2} 
+          
+
 refresh: Model -> Model
 refresh m = { m | steps = List.length m.creatures}
 
@@ -91,12 +125,14 @@ getDirection n = case n of
   3 -> UP
   _ -> DOWN
 
+
+gen = Random.int 1 4
+
 updateSingle : Model -> Model
 updateSingle m = case m.creatures of 
   [] -> m
   (x :: xs) -> if snd (getTimes x) <= 1 then { m | creatures = xs, steps = m.steps - 2}
-  else  let         gen  = Random.int 1 4  in
-          let     (i1, s1) = Random.generate gen m.seed in
+  else  let     (i1, s1) = Random.generate gen m.seed in
           let    d = getDirection i1 in
           let    newM = { m | seed = s1, steps = m.steps - 1} in
      if canMove newM.creatures d then 
@@ -179,6 +215,8 @@ getCreature list (x, y) = case List.filter (\d -> getCor d == (x, y)) list of
 main = StartApp.start { model  = initModel, 
                         view   = view, 
                         update = update }
+
+--main = show (populate model3)
                         
 -------------TEST--------------------
 --main = flow down <| List.map showTestResult
@@ -307,7 +345,9 @@ scaleFactor = 1
 tileSize   = 14 * scaleFactor  
 squareSize = 12 * scaleFactor
 
-boardSize  = rowN * tileSize   
+boardSize  = rowN * tileSize  
+
+panelWidth  = 170
 
 showBoard : Model -> Element           
 showBoard m = List.map (showColumn m) [1 .. columnN]
@@ -315,10 +355,13 @@ showBoard m = List.map (showColumn m) [1 .. columnN]
                 
 showColumn : Model -> Int -> Element
 showColumn m i =
-  let draw j = layers [sharkBox]
+  let draw j = case getCreature m.creatures (j, i) of
+                Nothing -> layers [box]
+                Just (Fish _) -> layers [fishBox]
+                Just (Shark _) -> layers [sharkBox]
       ranks  = List.map draw [1 ..  rowN]
   in
-  flow up (ranks)
+  flow down (ranks)
        |> container tileSize boardSize middle
        
 toTile : Form -> Element
@@ -338,11 +381,17 @@ sharkBox : Element
 sharkBox = square squareSize
          |> filled (Color.red)
          |> toTile
+         
+-- create buttons for the move choices
+choiceButton : Address Action -> Model -> Element
+choiceButton address model =
+    Graphics.Input.button (Signal.message address MakeAMove) "MakeAMove"
 
 view : Address Action -> Model -> Html  
 view address model = 
-    div[] [fromElement  (showBoard model)]
-
+    div[] [fromElement (showBoard model `beside`
+              (container panelWidth boardSize middle
+                (flow up [choiceButton address model])))]
 
 
 
