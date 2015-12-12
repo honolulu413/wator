@@ -307,7 +307,9 @@ scaleFactor = 1
 tileSize   = 14 * scaleFactor  
 squareSize = 12 * scaleFactor
 
-boardSize  = rowN * tileSize   
+boardSize  = rowN * tileSize  
+
+panelWidth  = 170
 
 showBoard : Model -> Element           
 showBoard m = List.map (showColumn m) [1 .. columnN]
@@ -315,10 +317,13 @@ showBoard m = List.map (showColumn m) [1 .. columnN]
                 
 showColumn : Model -> Int -> Element
 showColumn m i =
-  let draw j = layers [sharkBox]
+  let draw j = case getCreature m.creatures (j, i) of
+                Nothing -> layers [box]
+                Just (Fish _) -> layers [fishBox]
+                Just (Shark _) -> layers [sharkBox]
       ranks  = List.map draw [1 ..  rowN]
   in
-  flow up (ranks)
+  flow down (ranks)
        |> container tileSize boardSize middle
        
 toTile : Form -> Element
@@ -338,10 +343,17 @@ sharkBox : Element
 sharkBox = square squareSize
          |> filled (Color.red)
          |> toTile
+         
+-- create buttons for the move choices
+choiceButton : Address Action -> Model -> Element
+choiceButton address model =
+    Graphics.Input.button (Signal.message address MakeAMove) "MakeAMove"
 
 view : Address Action -> Model -> Html  
 view address model = 
-    div[] [fromElement  (showBoard model)]
+    div[] [fromElement (showBoard model `beside`
+              (container panelWidth boardSize middle
+                (flow up [choiceButton address model])))]
 
 
 
