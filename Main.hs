@@ -16,7 +16,7 @@ import Graphics.Element exposing (..)
 import Graphics.Collage exposing (..)
 import Color exposing (..)
 
-randomSeed = 123456
+randomSeed = 123457
 rowN = 75
 columnN = 75
 fishStarvation = 10000
@@ -55,9 +55,14 @@ fish1 = Fish (Object 2 3 fishGestation fishStarvation)
 fish2 = Fish (Object 3 2 fishGestation fishStarvation)
 fish3 = Fish (Object 3 4 fishGestation fishStarvation)
 fish4 = Fish (Object 4 3 fishGestation fishStarvation)
+fish5 = Fish (Object 3 3 fishGestation fishStarvation)
 shark0 = Shark (Object 3 3 sharkGestation sharkStarvation)
+shark1 = Shark (Object 3 3 -1 sharkStarvation)
 
 initModel = Model (Random.initialSeed randomSeed) [shark0, fish0, fish1, fish2, fish3, fish4 ] 6
+model1 = Model (Random.initialSeed randomSeed) [fish5, fish0, fish1, fish2, fish3, fish4 ] 6
+model2 = Model (Random.initialSeed randomSeed) [shark1, fish0, fish1, fish2, fish3, fish4 ] 6
+
 
 type Action
    = MakeAMove
@@ -106,7 +111,16 @@ removeCreature m (a, b) =
   let l = List.filter (\d -> getCor d == (a, b)) m.creatures in 
   case l of 
   [] -> m
-  _ -> { m | creatures = List.filter (\d -> getCor d /= (a, b)) m.creatures, steps = m.steps - 1}
+  _ -> { m | creatures = List.filter (\d -> getCor d /= (a, b)) m.creatures, steps = m.steps - 1} |> refillShark
+  
+refillShark : Model -> Model
+refillShark m = 
+ case m.creatures of 
+ [] -> m
+ (x :: xs) ->
+ let cor = getCor x in
+ let times = getTimes x in
+ { m | creatures = (newCreature x (fst cor) (snd cor) (fst times) sharkStarvation) :: xs}
 
 makeMove : Model -> (Int, Int) -> Model
 makeMove m (a, b) = 
@@ -114,7 +128,8 @@ makeMove m (a, b) =
   [] -> m
   (x :: xs) -> let times = getTimes x in 
                    let n = (newCreature x a b (fst times - 1) (snd times - 1)) in
-                   if fst times <= 1 then { m | creatures = xs ++ [n, (newBaby x (getCor x))]}
+                   let newMum = (newNewMum x a b  (snd times - 1)) in
+                   if fst times <= 1 then { m | creatures = xs ++ [newMum, (newBaby x (getCor x))]}
                    else                             { m | creatures = xs ++ [n]}
   
   
@@ -122,11 +137,16 @@ newCreature : Denizen -> Int -> Int -> Int -> Int -> Denizen
 newCreature de a b c d = let object =  (Object a b c d) in case de of
   Fish _ -> (Fish object)
   Shark _ -> (Shark object)
+  
+newNewMum : Denizen -> Int -> Int -> Int -> Denizen
+newNewMum de a b d = case de of 
+  Fish _ -> Fish (Object a b fishGestation d)
+  Shark _ -> Shark (Object a b sharkGestation d)
 
 newBaby : Denizen -> (Int, Int) -> Denizen
 newBaby de (a, b)= case de of 
   Fish _ -> newCreature de a b fishGestation fishStarvation
-  Shark _ -> newCreature de a b fishGestation sharkStarvation
+  Shark _ -> newCreature de a b sharkGestation sharkStarvation
 
 --[{ x | timeToGestation = x.timeToGestation - 1, timeToStarvation =x.timeToStarvation - 1}]
 newPosition : Direction -> (Int, Int) -> (Int, Int)
@@ -159,6 +179,127 @@ getCreature list (x, y) = case List.filter (\d -> getCor d == (x, y)) list of
 main = StartApp.start { model  = initModel, 
                         view   = view, 
                         update = update }
+                        
+-------------TEST--------------------
+--main = flow down <| List.map showTestResult
+--       [testUpdateNTImes, testRefresh, testRemoveCreature1, testRemoveCreature2, testNewPosition
+--       , testCanMove, testMakeMove, testMakeMove1, testGetCreature1, testGetCreature2, testGetCreature3]
+       
+testUpdateNTImes : Test
+testUpdateNTImes = let
+  t = Test ("testUpdateNTImes") Pass
+  m = initModel
+  newM = updateNTimes m
+  in
+  if newM.steps == 0 then t
+  else { t | result  = Fail <| flow right [show newM] }
+  
+testRefresh : Test
+testRefresh = let
+  t = Test ("testRefresh") Pass
+  m = initModel
+  newM = refresh (updateNTimes m)
+  in
+  if newM.steps == 5 then t
+  else { t | result  = Fail <| flow right [show newM] }
+  
+testRemoveCreature1 : Test
+testRemoveCreature1 = let
+  t = Test ("testRemoveCreature1") Pass
+  m = initModel
+  newM = removeCreature m (2, 3)
+  in
+  if List.length newM.creatures == 5 then t
+  else { t | result  = Fail <| flow right [show newM] }
+  
+testRemoveCreature2 : Test
+testRemoveCreature2 = let
+  t = Test ("testRemoveCreature2") Pass
+  m = initModel
+  newM = removeCreature m (10, 3)
+  in
+  if List.length newM.creatures == 6 then t
+  else { t | result  = Fail <| flow right [show newM] }
+
+testNewPosition : Test
+testNewPosition = let
+  t = Test ("testNewPosition") Pass
+  p1 = newPosition UP (2, 3)
+  p2 = newPosition DOWN (rowN, 3)
+  in
+  if p1 == (1, 3) && p2 == (1, 3) then t
+  else { t | result  = Fail <| flow right [show p1, show p2] }
+  
+testCanMove : Test
+testCanMove = let
+  t = Test ("testCanMove") Pass
+  result1 = canMove initModel.creatures UP
+  result2 = canMove model1.creatures UP
+  result3 = canMove model1.creatures DOWN
+  in
+  if result1 == True && result2 == False && result3 == False then t
+  else { t | result  = Fail <| flow right [show result1, show result2, show result3] }
+    
+testMakeMove : Test
+testMakeMove = let
+  t = Test ("testMakeMove") Pass
+  result1 = makeMove initModel (4, 3)
+  in
+  if  case List.head (List.reverse result1.creatures) of 
+  Nothing -> True
+  Just a -> getTimes a == (sharkGestation - 1, sharkStarvation - 1) then t
+  else { t | result  = Fail <| flow right [show result1] }
+  
+testMakeMove1: Test
+testMakeMove1 = let
+  t = Test ("testMakeMove1") Pass
+  result1 = makeMove model2 (4, 3)
+  in
+  if  case List.head (List.reverse result1.creatures) of 
+  Nothing -> True
+  Just a -> getTimes a == (sharkGestation, sharkStarvation) then t
+  else { t | result  = Fail <| flow right [show result1] }
+  
+testGetCreature1: Test
+testGetCreature1 = let
+  t = Test ("testGetCreature1") Pass
+  result1 = getCreature initModel.creatures (1, 1) in
+  if  case result1 of
+  Just (Fish _) -> True
+  _ -> False then t
+  else { t | result  = Fail <| flow right [show result1] }
+  
+testGetCreature2: Test
+testGetCreature2 = let
+  t = Test ("testGetCreature2") Pass
+  result1 = getCreature initModel.creatures (3, 3) in
+  if  case result1 of
+  Just (Shark _) -> True
+  _ -> False then t
+  else { t | result  = Fail <| flow right [show result1] }
+  
+testGetCreature3: Test
+testGetCreature3 = let
+  t = Test ("testGetCreature3") Pass
+  result1 = getCreature initModel.creatures (10, 3) in
+  if  case result1 of
+  Nothing  -> True
+  _ -> False then t
+  else { t | result  = Fail <| flow right [show result1] }
+ 
+type TestResult = Fail Element | Pass
+showTestResult t = flow right
+  (container 150 30 middle (leftAligned (fromString t.name)) ::
+   spacer 10 10 :: 
+  case t.result of
+    Fail e -> [color Color.red   (spacer 20 20), spacer 10 10, e]
+               
+    Pass   -> [color Color.green (spacer 20 20)])
+              
+
+type alias Test = { name : String, result : TestResult }
+
+------------Test End------------------------
 
 ------------VIEW---------------------------
 scaleFactor = 1
