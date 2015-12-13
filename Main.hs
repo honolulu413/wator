@@ -4,9 +4,11 @@ import Signal exposing (Address, message)
 import StartApp.Simple as StartApp
 import Color exposing(Color)
 import Array
+import String
 
-import Html exposing (Html, div, fromElement)
-import Html.Events exposing (onClick)
+import Html exposing (Html, div, fromElement, Attribute, input, span, text, toElement)
+import Html.Events exposing (onClick, on, targetValue)
+import Html.Attributes exposing (..)
 import Graphics.Collage exposing (Shape,Form,
   toForm,square,collage,rotate,moveY,filled,ngon,circle,text,rect,scale)
 import Graphics.Element exposing (..)
@@ -49,7 +51,7 @@ getTimes d =
 
 type Direction = LEFT | RIGHT | UP | DOWN
 
-type alias Model = {seed : Random.Seed, creatures : List Denizen, steps : Int, fishN : Int, sharkN : Int}
+type alias Model = {seed : Random.Seed, creatures : List Denizen, steps : Int, fishN : String, sharkN : String}
 
 fish0 = Fish (Object 1 1 fishGestation fishStarvation)
 fish1 = Fish (Object 2 3 fishGestation fishStarvation)
@@ -60,10 +62,10 @@ fish5 = Fish (Object 3 3 fishGestation fishStarvation)
 shark0 = Shark (Object 3 3 sharkGestation sharkStarvation)
 shark1 = Shark (Object 3 3 -1 sharkStarvation)
 
-initModel = Model (Random.initialSeed randomSeed) [shark0, fish0, fish1, fish2, fish3, fish4 ] 6 5 1
-model1 = Model (Random.initialSeed randomSeed) [fish5, fish0, fish1, fish2, fish3, fish4 ] 6 6 0
-model2 = Model (Random.initialSeed randomSeed) [shark1, fish0, fish1, fish2, fish3, fish4 ] 6 5 1
-model3 = Model (Random.initialSeed randomSeed) [shark1, fish0, fish1, fish2, fish3, fish4 ] 6 2 2
+initModel = Model (Random.initialSeed randomSeed) [shark0, fish0, fish1, fish2, fish3, fish4 ] 6 "5" "1"
+model1 = Model (Random.initialSeed randomSeed) [fish5, fish0, fish1, fish2, fish3, fish4 ] 6 "6" "0"
+model2 = Model (Random.initialSeed randomSeed) [shark1, fish0, fish1, fish2, fish3, fish4 ] 6 "5" "1"
+model3 = Model (Random.initialSeed randomSeed) [shark1, fish0, fish1, fish2, fish3, fish4 ] 6 "2" "2"
 
 
 type Action
@@ -76,8 +78,8 @@ update : Action -> Model -> Model
 update action model = 
    case action of
       MakeAMove -> updateWholeBoard model
-      SetFishN s -> { model | fishN = getInt s}
-      SetShark s -> { model | sharkN = getInt s}
+      SetFishN s -> { model | fishN = s}
+      SetShark s -> { model | sharkN = s}
       Populate -> populate (emptyCreatures model)
 
 getInt : String -> Int
@@ -89,7 +91,7 @@ emptyCreatures : Model -> Model
 emptyCreatures m  = { m | creatures = []}
 
 populate : Model -> Model
-populate  m = populateShark m.sharkN (populateFish m.fishN  (emptyCreatures m))  |> refresh
+populate  m = populateShark (getInt m.sharkN) (populateFish (getInt m.fishN)  (emptyCreatures m))  |> refresh
 
 populateFish : Int -> Model -> Model
 populateFish n m = case n of
@@ -108,7 +110,7 @@ populateShark n m = case n of
           let (x, s1) = Random.generate gen1 m.seed in
           let (y, s2) = Random.generate gen1 s1 in
           case getCreature m.creatures (x, y) of
-          Nothing -> populateFish (n-1) {m | creatures = m.creatures ++ [Fish (Object x y sharkGestation sharkStarvation)], seed = s2} 
+          Nothing -> populateFish (n-1) {m | creatures = m.creatures ++ [Shark (Object x y sharkGestation sharkStarvation)], seed = s2} 
           _ -> populateFish n { m | seed = s2} 
 
 refresh: Model -> Model
@@ -387,16 +389,42 @@ sharkBox = square squareSize
          |> filled (Color.red)
          |> toTile
          
--- create buttons for the move choices
-choiceButton : Address Action -> Model -> Element
-choiceButton address model =
-    Graphics.Input.button (Signal.message address MakeAMove) "MakeAMove"
+choiceButton : Address Action -> Model -> String -> Element
+choiceButton address model s =
+    if s == "Populate" then Graphics.Input.button (Signal.message address Populate) s
+    else Graphics.Input.button (Signal.message address MakeAMove) s
+
+field : String -> Address Action -> (String -> Action) -> String -> String -> Html
+field fieldType address toAction name content =
+  div []
+    [ div [fieldNameStyle "160px"] [Html.text name]
+    , input
+        [ type' fieldType
+        , placeholder name
+        , value content
+        , on "input" targetValue (\string -> Signal.message address (toAction string))
+        ]
+        []
+    ]
+
+
+fieldNameStyle : String -> Attribute
+fieldNameStyle px =
+  style
+    [ ("width", px)
+    , ("padding", "10px")
+    , ("text-align", "right")
+    , ("display", "inline-block")
+    ]
 
 view : Address Action -> Model -> Html  
 view address model = 
     div[] [fromElement (showBoard model `beside`
               (container panelWidth boardSize middle
-                (flow up [choiceButton address model])))]
+                (flow up [choiceButton address model "Make a Move",
+                          choiceButton address model "Populate"]))),
+                field "text" address SetFishN "Set Fish Number" model.fishN,
+                field "text" address SetShark "Set Shark Number" model.sharkN]
 
 
 
