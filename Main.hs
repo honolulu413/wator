@@ -24,7 +24,7 @@ rowN = 30
 columnN = 30
 fishStarvation = 10000
 fishGestation = 10
-sharkStarvation = 20
+sharkStarvation = 30
 sharkGestation = 20
 
 
@@ -419,12 +419,13 @@ fieldNameStyle px =
 
 view : Address Action -> Model -> Html  
 view address model = 
-    div[] [fromElement (showBoard model `beside`
+    div[] [fromElement (showBoard model `beside` 
               (container panelWidth boardSize middle
                 (flow up [choiceButton address model "Make a Move",
-                          choiceButton address model "Populate"]))),
+                          choiceButton address model "Populate"])) `beside` show model ),
                 field "text" address SetFishN "Set Fish Number" model.fishN,
-                field "text" address SetShark "Set Shark Number" model.sharkN]
+                field "text" address SetShark "Set Shark Number" model.sharkN
+                ]
 
 
 
