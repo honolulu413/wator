@@ -3,6 +3,7 @@ import Dict exposing (Dict)
 import Signal exposing (Address, message)
 import StartApp.Simple as StartApp
 import Color exposing(Color)
+import Array
 
 import Html exposing (Html, div, fromElement)
 import Html.Events exposing (onClick)
@@ -67,17 +68,22 @@ model3 = Model (Random.initialSeed randomSeed) [shark1, fish0, fish1, fish2, fis
 
 type Action
    = MakeAMove
-   | SetFishN Int
-   | SetShark Int
+   | SetFishN String
+   | SetShark String
    | Populate
    
 update : Action -> Model -> Model               
 update action model = 
    case action of
       MakeAMove -> updateWholeBoard model
-      SetFishN n -> { model | fishN = n}
-      SetShark n -> { model | sharkN = n}
+      SetFishN s -> { model | fishN = getInt s}
+      SetShark s -> { model | sharkN = getInt s}
       Populate -> populate (emptyCreatures model)
+
+getInt : String -> Int
+getInt s = case String.toInt s of 
+  Ok n -> n
+  Err _ -> 5
 
 emptyCreatures : Model -> Model
 emptyCreatures m  = { m | creatures = []}
@@ -104,7 +110,6 @@ populateShark n m = case n of
           case getCreature m.creatures (x, y) of
           Nothing -> populateFish (n-1) {m | creatures = m.creatures ++ [Fish (Object x y sharkGestation sharkStarvation)], seed = s2} 
           _ -> populateFish n { m | seed = s2} 
-          
 
 refresh: Model -> Model
 refresh m = { m | steps = List.length m.creatures}
