@@ -110,8 +110,8 @@ populateShark n m = case n of
           let (x, s1) = Random.generate gen1 m.seed in
           let (y, s2) = Random.generate gen1 s1 in
           case getCreature m.creatures (x, y) of
-          Nothing -> populateFish (n-1) {m | creatures = m.creatures ++ [Shark (Object x y sharkGestation sharkStarvation)], seed = s2} 
-          _ -> populateFish n { m | seed = s2} 
+          Nothing -> populateShark (n-1) {m | creatures = m.creatures ++ [Shark (Object x y sharkGestation sharkStarvation)], seed = s2} 
+          _ -> populateShark n { m | seed = s2} 
 
 refresh: Model -> Model
 refresh m = { m | steps = List.length m.creatures}
