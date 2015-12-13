@@ -24,7 +24,7 @@ rowN = 30
 columnN = 30
 fishStarvation = 10000
 fishGestation = 10
-sharkStarvation = 30
+sharkStarvation = 20
 sharkGestation = 20
 
 
@@ -120,10 +120,7 @@ updateWholeBoard : Model -> Model
 updateWholeBoard m = updateNTimes m |> refresh
 
 updateNTimes : Model -> Model
-updateNTimes m  = 
-  case m.steps of 
-  0 -> m
-  _ -> updateSingle m |> updateNTimes
+updateNTimes m  = if m.steps <= 0 then m else updateSingle m |> updateNTimes
   
 getDirection : Int -> Direction
 getDirection n = case n of
@@ -426,7 +423,6 @@ view address model =
                 field "text" address SetFishN "Set Fish Number" model.fishN,
                 field "text" address SetShark "Set Shark Number" model.sharkN
                 ]
-
 
 
 
